@@ -2,38 +2,28 @@
 
 namespace app\models;
 
-class User extends \yii\base\Object implements \yii\web\IdentityInterface
+use Yii;
+use yii\base\Object;
+use yii\db\ActiveRecord;
+
+class User extends ActiveRecord implements \yii\web\IdentityInterface
 {
-    public $id;
-    public $username;
-    public $password;
-    public $authKey;
-    public $accessToken;
+    const ROLE_USER=1;
+    const ROLE_ADMIN=2;
 
-    private static $users = [
-        '100' => [
-            'id' => '100',
-            'username' => 'admin',
-            'password' => 'admin',
-            'authKey' => 'test100key',
-            'accessToken' => '100-token',
-        ],
-        '101' => [
-            'id' => '101',
-            'username' => 'demo',
-            'password' => 'demo',
-            'authKey' => 'test101key',
-            'accessToken' => '101-token',
-        ],
-    ];
+    const STATUS_ACTIVE=1;
 
+    public static function tableName()
+    {
+        return 'users';
+    }
 
     /**
      * @inheritdoc
      */
     public static function findIdentity($id)
     {
-        return isset(self::$users[$id]) ? new static(self::$users[$id]) : null;
+        return static::findOne(['id' => $id, 'status' => self::STATUS_ACTIVE]);
     }
 
     /**
@@ -41,11 +31,6 @@ class User extends \yii\base\Object implements \yii\web\IdentityInterface
      */
     public static function findIdentityByAccessToken($token, $type = null)
     {
-        foreach (self::$users as $user) {
-            if ($user['accessToken'] === $token) {
-                return new static($user);
-            }
-        }
 
         return null;
     }
@@ -65,6 +50,19 @@ class User extends \yii\base\Object implements \yii\web\IdentityInterface
         }
 
         return null;
+    }
+
+    public static function isUserAdmin($username)
+    {
+        if (static::findOne(['email' => $username, 'role' => self::ROLE_ADMIN]))
+            return true;
+        else
+            return false;
+    }
+
+    public static function findByLogin($email)
+    {
+        return static::findOne(['email' => $email]);
     }
 
     /**
@@ -91,6 +89,14 @@ class User extends \yii\base\Object implements \yii\web\IdentityInterface
         return $this->authKey === $authKey;
     }
 
+    public static function checkRole($role){
+        if(!Yii::$app->user->isGuest){
+            if(Yii::$app->user->identity->role==$role)
+                return true;
+        }
+        return false;
+    }
+
     /**
      * Validates password
      *
@@ -99,6 +105,12 @@ class User extends \yii\base\Object implements \yii\web\IdentityInterface
      */
     public function validatePassword($password)
     {
-        return $this->password === $password;
+        if (Yii::$app->getSecurity()->validatePassword($password, $this->password))
+           return true;
+        return false;
+    }
+
+    public static function generateString($int){
+        return Yii::$app->security->generateRandomString($int);
     }
 }
